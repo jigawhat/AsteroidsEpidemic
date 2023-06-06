@@ -25,6 +25,21 @@ ctx.stroke();
 
 <script>
 
+
+// Constants
+
+const WIDTH = 800;
+const HEIGHT = 600;
+const DOUGHNUT_MARGIN = 50;
+const SHIP_SPEED = 0.1;
+const SHIP_TURN_SPEED = 7.5;
+const MISSILE_SPEED = 8.5;
+const MISSILE_LENGTH = 15;
+const MISSILE_LIFESPAN = 75;
+
+
+// Variables
+
 var ship;
 var missiles = [];
 var firing = false;
@@ -37,12 +52,17 @@ function startGame() {
 var myGameArea = {
   canvas : document.createElement("canvas"),
   start : function() {
-    this.canvas.width = 800;
-    this.canvas.height = 600;
+
+    // Setup canvas
+    this.canvas.width = WIDTH;
+    this.canvas.height = HEIGHT;
     this.context = this.canvas.getContext("2d");
     document.body.insertBefore(this.canvas, document.body.childNodes[0]);
+
+    // Setup frames
     this.interval = setInterval(updateGameArea, 20);
 
+    // Add keyboard listeners
     window.addEventListener('keydown', function (e) {
       myGameArea.keys = (myGameArea.keys || []);
       myGameArea.keys[e.keyCode] = true;
@@ -52,59 +72,95 @@ var myGameArea = {
       myGameArea.keys[e.keyCode] = false;
     })
   },
+
+  // Refresh screen
   clear : function() {
     this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
   }
 }
 
+// Abstract class for game objects to loop
 class MovingObject {
   constructor(x, y) {
     this.speedX = 0;
     this.speedY = 0;
     this.angle = 0;
-    this.moveAngle = 0;
+    this.moveAngle = 0;  // Angular speed
     this.x = x;
     this.y = y;
   }
   newPos() {
-    this.x += this.speedX;
-    this.y += this.speedY;
+    // Update angle and position
     this.angle += this.moveAngle;
+    var new_x = this.x + this.speedX;
+    var new_y = this.y + this.speedY;
+
+    // Doughnut-shaped universe implementation
+    if (new_x < -DOUGHNUT_MARGIN) {
+      new_x = WIDTH + DOUGHNUT_MARGIN
+    } else if (new_x > WIDTH + DOUGHNUT_MARGIN) {
+      new_x = -DOUGHNUT_MARGIN
+    }
+    if (new_y < -DOUGHNUT_MARGIN) {
+      new_y = HEIGHT + DOUGHNUT_MARGIN
+    } else if (new_y > HEIGHT + DOUGHNUT_MARGIN) {
+      new_y = -DOUGHNUT_MARGIN
+    }
+    this.x = new_x;
+    this.y = new_y;
   }
 }
 
+// Missile class
 class Missile extends MovingObject {
-  constructor(x, y, angle, speedX, speedY) {
+  constructor(x, y, angle, speedX, speedY, missile_index) {
     super(x, y);
     var angleCos = Math.cos(angle);
     var angleSin = Math.sin(angle);
-    this.speedX = speedX + (5.5 * angleCos);
-    this.speedY = speedY + (5.5 * angleSin);
-    this.trailOffsetX = 15 * angleCos;
-    this.trailOffsetY = 15 * angleSin;
+    this.speedX = (MISSILE_SPEED * angleCos);
+    this.speedY = (MISSILE_SPEED * angleSin);
+    this.trailOffsetX = MISSILE_LENGTH * angleCos;
+    this.trailOffsetY = MISSILE_LENGTH * angleSin;
+    this.missile_index = missile_index;
+    this.framesTilDeath = MISSILE_LIFESPAN;
   }
   update() {
+
+    // Draw missile
     var ctx = myGameArea.context;
     ctx.beginPath();
     ctx.moveTo(this.x, this.y);
     ctx.lineTo(this.x + this.trailOffsetX, this.y + this.trailOffsetY);
     ctx.stroke();
+
+    // Delete missile if older than it's lifespan
+    this.framesTilDeath--;
+    if (this.framesTilDeath <= 0) {
+      for (let i = this.missile_index + 1; i < missiles.length; i++) {
+        missiles[i].missile_index--;
+      }
+      delete missiles[this.missile_index];
+      missiles.splice(this.missile_index, 1);
+    }
+
   }
 }
 
+// Player spaceship class
 class Ship extends MovingObject {
 
   constructor(x, y) {
     super(x, y);
   }
   update() {
+
+    // Draw spaceship
     var ctx = myGameArea.context;
     ctx.save();
     ctx.translate(this.x, this.y);
     ctx.rotate(this.angle);
 
     // ctx.fillStyle = color;
-    // ctx.fillRect(this.x, this.y, this.width, this.height);
     ctx.beginPath();
     ctx.moveTo(10, 15);
     ctx.lineTo(0, -15);
@@ -117,38 +173,39 @@ class Ship extends MovingObject {
   }
 }
 
+// Update per frame function
 function updateGameArea() {
   myGameArea.clear();
-  // ship.speedX = 0;
-  // ship.angle += 1 * Math.PI / 180;
-  // ship.speedY = 0;
   ship.moveAngle = 0;
-  if (myGameArea.keys && myGameArea.keys[37]) {ship.moveAngle = -5.5 * Math.PI / 180}
-  if (myGameArea.keys && myGameArea.keys[39]) {ship.moveAngle = 5.5 * Math.PI / 180}
-  if (myGameArea.keys && myGameArea.keys[38]) {
-    ship.speedX += 0.1 * Math.cos(ship.angle - Math.PI / 2);
-    ship.speedY += 0.1 * Math.sin(ship.angle - Math.PI / 2);
-  }
-  // if (myGameArea.keys && myGameArea.keys[37]) {ship.speedX = -1; }
-  // if (myGameArea.keys && myGameArea.keys[39]) {ship.speedX = 1; }
-  // if (myGameArea.keys && myGameArea.keys[38]) {ship.speedY = -1; }
-  // if (myGameArea.keys && myGameArea.keys[40]) {ship.speedY = 1; }
 
-  if (myGameArea.keys && myGameArea.keys[32]) {
+  // Game control listeners
+  if (myGameArea.keys && myGameArea.keys[37]) {ship.moveAngle = -SHIP_TURN_SPEED * Math.PI / 180}
+  if (myGameArea.keys && myGameArea.keys[39]) {ship.moveAngle = SHIP_TURN_SPEED * Math.PI / 180}
+  if (myGameArea.keys && myGameArea.keys[38]) {
+    ship.speedX += SHIP_SPEED * Math.cos(ship.angle - Math.PI / 2);
+    ship.speedY += SHIP_SPEED * Math.sin(ship.angle - Math.PI / 2);
+  }
+
+  // Missile fire event listener
+  if (myGameArea.keys && (myGameArea.keys[32] || myGameArea.keys[90])) {
     if (!firing) {
       firing = true;
       missiles.push(new Missile(ship.x, ship.y, ship.angle - Math.PI / 2,
-        ship.speedX, ship.speedY));
+        ship.speedX, ship.speedY, missiles.length));
     }
   } else {
     firing = false;
   }
 
+  // Update object positions and call update function
   for (let i = 0; i < missiles.length; i++) {
     missiles[i].newPos();
+    var mlen = missiles.length;
     missiles[i].update();
+    if (mlen != missiles.length) { // Missile was deleted; adjust index
+      i--;
+    }
   }
-
   ship.newPos();
   ship.update();
 }
