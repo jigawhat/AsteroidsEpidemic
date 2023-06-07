@@ -30,19 +30,25 @@ ctx.stroke();
 
 const WIDTH = 800;
 const HEIGHT = 600;
-const DOUGHNUT_MARGIN = 50;        // Margin for doughnut-shaped universe looping
-const FRAMERATE = 50;              // Game framerate
+const DOUGHNUT_MARGIN = 50;                  // Margin for doughnut-shaped universe looping
+const FRAMERATE = 50;                        // Game framerate
 const SHIP_SPEED = 0.1;
 const SHIP_TURN_SPEED = 7.5;
-const SAFE_SPAWN_DISTANCE = 150;   // Minimum distance from ship to asteroid spawn
+const SAFE_SPAWN_DISTANCE = 150;             // Minimum distance from ship to asteroid spawn
 const MISSILE_SPEED = 8.5;
 const MISSILE_LENGTH = 15;
-const MISSILE_LIFESPAN = 75;       // Missile lifespan in frames
+const MISSILE_LIFESPAN = 75;                 // Missile lifespan in frames
 const ASTEROID_NUM_POINTS = 16;   
-const SMALL_ASTEROID_RADIUS = 5;
-const MEDIUM_ASTEROID_RADIUS = 12;
-const LARGE_ASTEROID_RADIUS = 45;
-const ASTEROID_SPEED = 0.005;
+const SMALL_ASTEROID_RADIUS = 20;
+const MEDIUM_ASTEROID_RADIUS = 37;
+const LARGE_ASTEROID_RADIUS = 55;
+const ASTEROID_ROTATE_SPEED = 0.005;
+const ASTEROID_SPEED = 1.0;
+const ASTEROID_MAXAGE = 7.0;                 // Maximum possible age before evolution
+const ASTEROID_EVOLUTION_TIMER = 2.1;
+const SMALL_ASTEROID_SPEED_MULTIPLIER = 2.0;
+const MEDIUM_ASTEROID_SPEED_MULTIPLIER = 1.4;
+
 
 
 // Variables
@@ -57,7 +63,7 @@ var firing = false;
 function startGame() {
   myGameArea.start();
   ship = new Ship(10, 120);
-  test_asteroid = new Asteroid("LARGE");
+  test_asteroid = new Asteroid("SMALL", null, null);
   asteroids.push(test_asteroid);
 }
 
@@ -126,13 +132,15 @@ class MovingObject {
 // Asteroid class
 const angle_incr = 2 * Math.PI / ASTEROID_NUM_POINTS;
 class Asteroid extends MovingObject {
-  constructor(state) {
-    // Spawn the asteroid a safe distance from the ship
-    var x = Math.random() * WIDTH;
-    var y = Math.random() * HEIGHT;
-    while (ship && distance(x, y, ship.x, ship.y) < SAFE_SPAWN_DISTANCE) {
-      x = Math.random() * WIDTH;
-      y = Math.random() * HEIGHT;
+  constructor(state, x, y) {
+    if (x == null) {
+      // Spawn the asteroid a safe distance from the ship
+      var x = Math.random() * WIDTH;
+      var y = Math.random() * HEIGHT;
+      while (ship && distance(x, y, ship.x, ship.y) < SAFE_SPAWN_DISTANCE) {
+        x = Math.random() * WIDTH;
+        y = Math.random() * HEIGHT;
+      }
     }
     super(x, y);
     this.state = state;
@@ -140,26 +148,29 @@ class Asteroid extends MovingObject {
     var speed_multiplier = 1.0;
     if (state == "MEDIUM") {
       this.radius = MEDIUM_ASTEROID_RADIUS;
-      speed_multiplier = 1.4;
+      speed_multiplier = MEDIUM_ASTEROID_SPEED_MULTIPLIER;
+      this.framesTilEvolution = (Math.random() * (ASTEROID_MAXAGE * FRAMERATE)) + 2;
     } else if (state == "SMALL") {
       this.radius = SMALL_ASTEROID_RADIUS;
-      speed_multiplier = 2.0;
+      speed_multiplier = SMALL_ASTEROID_SPEED_MULTIPLIER;
+      this.framesTilEvolution = (Math.random() * (ASTEROID_MAXAGE * FRAMERATE)) + 2;
     }
-    this.speedX = (Math.random() - 0.5) * 2.0 * 5.0 * speed_multiplier;
-    this.speedY = (Math.random() - 0.5) * 2.0 * 5.0 * speed_multiplier;
-    this.moveAngle = (Math.random() - 0.5) * 2.0 * ASTEROID_SPEED * speed_multiplier;
+    this.original_radius = this.radius;
+    this.just_started_evolving = true;
+    this.framesTilEvolutionActual = null;
+    this.speedX = (Math.random() - 0.5) * 2.0 * ASTEROID_SPEED * speed_multiplier;
+    this.speedY = (Math.random() - 0.5) * 2.0 * ASTEROID_SPEED * speed_multiplier;
+    this.moveAngle = (Math.random() - 0.5) * 2.0 * ASTEROID_ROTATE_SPEED * speed_multiplier;
 
     this.spoke_angle_offsets = [];
     this.spoke_radii_offsets = [];
     for (let i = 0; i < ASTEROID_NUM_POINTS; i++) {
       this.spoke_angle_offsets.push((Math.random() - 0.5) * 2.0 * angle_incr / 2);
-      this.spoke_radii_offsets.push((Math.random() - 0.5) * 2.0 * this.radius / 2);
+      this.spoke_radii_offsets.push((Math.random() - 0.5) * 2.0 * 1.0 / 2);
     }
   }
 
-
   update () {
-
 
     this.spoke_angles = [];
     this.spoke_radii = [];
@@ -169,7 +180,7 @@ class Asteroid extends MovingObject {
     
     for (let i = 0; i < ASTEROID_NUM_POINTS; i++) {
       this.spoke_angles.push(this.angle + (angle_incr * i) + this.spoke_angle_offsets[i]);
-      this.spoke_radii.push(this.radius + this.spoke_radii_offsets[i]);
+      this.spoke_radii.push(this.radius + (this.spoke_radii_offsets[i] * this.radius));
       this.polygon_x.push(this.spoke_radii[i] * Math.cos(this.spoke_angles[i]));
       this.polygon_y.push(this.spoke_radii[i] * Math.sin(this.spoke_angles[i]));
     }
@@ -183,6 +194,43 @@ class Asteroid extends MovingObject {
     }
     ctx.lineTo(this.x + this.polygon_x[0], this.y + this.polygon_y[0]);
     ctx.stroke();
+
+    // Evolve if ready
+    if (this.state != "LARGE") {
+      this.framesTilEvolution--;
+      if (this.framesTilEvolution <= 0) {
+        if (this.just_started_evolving) {
+          this.just_started_evolving = false;
+          this.framesTilEvolutionActual = ASTEROID_EVOLUTION_TIMER * FRAMERATE;
+        }
+        this.framesTilEvolutionActual--;
+        this.radius += 0.5;
+        var new_radius = LARGE_ASTEROID_RADIUS;
+        if (this.state == "SMALL") {
+          new_radius = MEDIUM_ASTEROID_RADIUS;
+        }
+        if (this.radius > new_radius) {
+          this.radius = this.original_radius;
+        }
+        if (this.framesTilEvolutionActual <= 0) {
+          if (this.state == "SMALL") {
+            this.state = "MEDIUM";  
+            this.radius = MEDIUM_ASTEROID_RADIUS;
+            this.original_radius = MEDIUM_ASTEROID_RADIUS;
+            this.speedX /= (SMALL_ASTEROID_SPEED_MULTIPLIER/MEDIUM_ASTEROID_SPEED_MULTIPLIER);
+            this.speedY /= (SMALL_ASTEROID_SPEED_MULTIPLIER/MEDIUM_ASTEROID_SPEED_MULTIPLIER);
+            this.framesTilEvolution = (Math.random() * (ASTEROID_MAXAGE * FRAMERATE)) + 2;
+            this.just_started_evolving = true;
+          } else {
+            this.state = "LARGE";
+            this.radius = LARGE_ASTEROID_RADIUS;
+            this.original_radius = LARGE_ASTEROID_RADIUS;
+            this.speedX /= (MEDIUM_ASTEROID_SPEED_MULTIPLIER/1.0);
+            this.speedY /= (MEDIUM_ASTEROID_SPEED_MULTIPLIER/1.0);
+          }
+        }
+      }
+    }
   }
 }
 
