@@ -30,23 +30,35 @@ ctx.stroke();
 
 const WIDTH = 800;
 const HEIGHT = 600;
-const DOUGHNUT_MARGIN = 50;
+const DOUGHNUT_MARGIN = 50;        // Margin for doughnut-shaped universe looping
+const FRAMERATE = 50;              // Game framerate
 const SHIP_SPEED = 0.1;
 const SHIP_TURN_SPEED = 7.5;
+const SAFE_SPAWN_DISTANCE = 150;   // Minimum distance from ship to asteroid spawn
 const MISSILE_SPEED = 8.5;
 const MISSILE_LENGTH = 15;
-const MISSILE_LIFESPAN = 75;
+const MISSILE_LIFESPAN = 75;       // Missile lifespan in frames
+const ASTEROID_NUM_POINTS = 16;   
+const SMALL_ASTEROID_RADIUS = 5;
+const MEDIUM_ASTEROID_RADIUS = 12;
+const LARGE_ASTEROID_RADIUS = 45;
+const ASTEROID_SPEED = 0.005;
 
 
 // Variables
 
 var ship;
 var missiles = [];
+var asteroids = [];
 var firing = false;
 
+
+// Initialise game
 function startGame() {
   myGameArea.start();
   ship = new Ship(10, 120);
+  test_asteroid = new Asteroid("LARGE");
+  asteroids.push(test_asteroid);
 }
 
 var myGameArea = {
@@ -60,7 +72,7 @@ var myGameArea = {
     document.body.insertBefore(this.canvas, document.body.childNodes[0]);
 
     // Setup frames
-    this.interval = setInterval(updateGameArea, 20);
+    this.interval = setInterval(updateGameArea, 1000 / FRAMERATE);
 
     // Add keyboard listeners
     window.addEventListener('keydown', function (e) {
@@ -108,6 +120,69 @@ class MovingObject {
     }
     this.x = new_x;
     this.y = new_y;
+  }
+}
+
+// Asteroid class
+const angle_incr = 2 * Math.PI / ASTEROID_NUM_POINTS;
+class Asteroid extends MovingObject {
+  constructor(state) {
+    // Spawn the asteroid a safe distance from the ship
+    var x = Math.random() * WIDTH;
+    var y = Math.random() * HEIGHT;
+    while (ship && distance(x, y, ship.x, ship.y) < SAFE_SPAWN_DISTANCE) {
+      x = Math.random() * WIDTH;
+      y = Math.random() * HEIGHT;
+    }
+    super(x, y);
+    this.state = state;
+    this.radius = LARGE_ASTEROID_RADIUS;
+    var speed_multiplier = 1.0;
+    if (state == "MEDIUM") {
+      this.radius = MEDIUM_ASTEROID_RADIUS;
+      speed_multiplier = 1.4;
+    } else if (state == "SMALL") {
+      this.radius = SMALL_ASTEROID_RADIUS;
+      speed_multiplier = 2.0;
+    }
+    this.speedX = (Math.random() - 0.5) * 2.0 * 5.0 * speed_multiplier;
+    this.speedY = (Math.random() - 0.5) * 2.0 * 5.0 * speed_multiplier;
+    this.moveAngle = (Math.random() - 0.5) * 2.0 * ASTEROID_SPEED * speed_multiplier;
+
+    this.spoke_angle_offsets = [];
+    this.spoke_radii_offsets = [];
+    for (let i = 0; i < ASTEROID_NUM_POINTS; i++) {
+      this.spoke_angle_offsets.push((Math.random() - 0.5) * 2.0 * angle_incr / 2);
+      this.spoke_radii_offsets.push((Math.random() - 0.5) * 2.0 * this.radius / 2);
+    }
+  }
+
+
+  update () {
+
+
+    this.spoke_angles = [];
+    this.spoke_radii = [];
+    this.polygon_x = [];
+    this.polygon_y = [];
+    var angle = 0;
+    
+    for (let i = 0; i < ASTEROID_NUM_POINTS; i++) {
+      this.spoke_angles.push(this.angle + (angle_incr * i) + this.spoke_angle_offsets[i]);
+      this.spoke_radii.push(this.radius + this.spoke_radii_offsets[i]);
+      this.polygon_x.push(this.spoke_radii[i] * Math.cos(this.spoke_angles[i]));
+      this.polygon_y.push(this.spoke_radii[i] * Math.sin(this.spoke_angles[i]));
+    }
+
+    // Draw asteroid
+    var ctx = myGameArea.context;
+    ctx.beginPath();
+    ctx.moveTo(this.x + this.polygon_x[0], this.y + this.polygon_y[0]);
+    for (let i = 1; i < ASTEROID_NUM_POINTS; i++) {
+      ctx.lineTo(this.x + this.polygon_x[i], this.y + this.polygon_y[i]);
+    }
+    ctx.lineTo(this.x + this.polygon_x[0], this.y + this.polygon_y[0]);
+    ctx.stroke();
   }
 }
 
@@ -182,8 +257,8 @@ function updateGameArea() {
   if (myGameArea.keys && myGameArea.keys[37]) {ship.moveAngle = -SHIP_TURN_SPEED * Math.PI / 180}
   if (myGameArea.keys && myGameArea.keys[39]) {ship.moveAngle = SHIP_TURN_SPEED * Math.PI / 180}
   if (myGameArea.keys && myGameArea.keys[38]) {
-    ship.speedX += SHIP_SPEED * Math.cos(ship.angle - Math.PI / 2);
-    ship.speedY += SHIP_SPEED * Math.sin(ship.angle - Math.PI / 2);
+    ship.speedX += SHIP_SPEED * Math.cos(ship.angle - (Math.PI / 2));
+    ship.speedY += SHIP_SPEED * Math.sin(ship.angle - (Math.PI / 2));
   }
 
   // Missile fire event listener
@@ -206,8 +281,21 @@ function updateGameArea() {
       i--;
     }
   }
+  for (let i = 0; i < asteroids.length; i++) {
+    asteroids[i].newPos();
+    var alen = asteroids.length;
+    asteroids[i].update();
+    if (alen != asteroids.length) { // Asteroid was deleted; adjust index
+      i--;
+    }
+  }
   ship.newPos();
   ship.update();
+}
+
+
+function distance(x1, y1, x2, y2) {
+  return Math.sqrt(((x1 - x2) ** 2) + ((y1 - y2) ** 2));
 }
 
 
