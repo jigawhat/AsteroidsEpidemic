@@ -63,7 +63,7 @@ var firing = false;
 function startGame() {
   myGameArea.start();
   ship = new Ship(10, 120);
-  test_asteroid = new Asteroid("SMALL", null, null);
+  test_asteroid = new Asteroid("MEDIUM", null, null);
   asteroids.push(test_asteroid);
 }
 
@@ -171,18 +171,20 @@ class Asteroid extends MovingObject {
   }
 
   update () {
-
     this.spoke_angles = [];
     this.spoke_radii = [];
     this.polygon_x = [];
     this.polygon_y = [];
+    this.polygon = [];
     var angle = 0;
     
+    // Compute polygon
     for (let i = 0; i < ASTEROID_NUM_POINTS; i++) {
       this.spoke_angles.push(this.angle + (angle_incr * i) + this.spoke_angle_offsets[i]);
       this.spoke_radii.push(this.radius + (this.spoke_radii_offsets[i] * this.radius));
       this.polygon_x.push(this.spoke_radii[i] * Math.cos(this.spoke_angles[i]));
       this.polygon_y.push(this.spoke_radii[i] * Math.sin(this.spoke_angles[i]));
+      this.polygon.push([this.x + this.polygon_x[i], this.y + this.polygon_y[i]]);
     }
 
     // Draw asteroid
@@ -321,19 +323,55 @@ function updateGameArea() {
   }
 
   // Update object positions and call update function
-  for (let i = 0; i < missiles.length; i++) {
-    missiles[i].newPos();
-    var mlen = missiles.length;
-    missiles[i].update();
-    if (mlen != missiles.length) { // Missile was deleted; adjust index
-      i--;
-    }
-  }
   for (let i = 0; i < asteroids.length; i++) {
     asteroids[i].newPos();
     var alen = asteroids.length;
     asteroids[i].update();
     if (alen != asteroids.length) { // Asteroid was deleted; adjust index
+      i--;
+    }
+  }
+  // Detect collisions
+  for (let i = 0; i < missiles.length; i++) {
+    for (let j = 0; j < asteroids.length; j++) {
+      if (!asteroids[j].polygon) {
+        continue;  // Don't detect collisions for newly spawned asteroids
+      }
+      if (inside([missiles[i].x, missiles[i].y], asteroids[j].polygon)) {
+        // Spawn smaller asteroids
+        if (asteroids[j].state == "MEDIUM") {
+          asteroids.push(new Asteroid("SMALL",
+            asteroids[j].x + (Math.random() - 0.5) * 2.0 * MEDIUM_ASTEROID_RADIUS * 0.7,
+            asteroids[j].y + (Math.random() - 0.5) * 2.0 * MEDIUM_ASTEROID_RADIUS * 0.7))
+          asteroids.push(new Asteroid("SMALL",
+            asteroids[j].x + (Math.random() - 0.5) * 2.0 * MEDIUM_ASTEROID_RADIUS * 0.7,
+            asteroids[j].y + (Math.random() - 0.5) * 2.0 * MEDIUM_ASTEROID_RADIUS * 0.7))
+        } else if (asteroids[j].state == "LARGE") {
+          asteroids.push(new Asteroid("MEDIUM",
+            asteroids[j].x + (Math.random() - 0.5) * 2.0 * LARGE_ASTEROID_RADIUS * 0.7,
+            asteroids[j].y + (Math.random() - 0.5) * 2.0 * LARGE_ASTEROID_RADIUS * 0.7))
+          asteroids.push(new Asteroid("MEDIUM",
+            asteroids[j].x + (Math.random() - 0.5) * 2.0 * LARGE_ASTEROID_RADIUS * 0.7,
+            asteroids[j].y + (Math.random() - 0.5) * 2.0 * LARGE_ASTEROID_RADIUS * 0.7))
+        }
+        // Adjust indexes for deleted missile
+        for (let k = i + 1; k < missiles.length; k++) {
+          missiles[k].missile_index--;
+        }
+        delete missiles[i];
+        missiles.splice(i, 1);
+        delete asteroids[j];
+        asteroids.splice(j, 1);
+        i--;
+        j--;
+      }
+    }
+  }
+  for (let i = 0; i < missiles.length; i++) {
+    missiles[i].newPos();
+    var mlen = missiles.length;
+    missiles[i].update();
+    if (mlen != missiles.length) { // Missile was deleted; adjust index
       i--;
     }
   }
@@ -345,6 +383,25 @@ function updateGameArea() {
 function distance(x1, y1, x2, y2) {
   return Math.sqrt(((x1 - x2) ** 2) + ((y1 - y2) ** 2));
 }
+
+function inside(point, vs) {
+    // ray-casting algorithm based on
+    // https://wrf.ecse.rpi.edu/Research/Short_Notes/pnpoly.html
+    
+    var x = point[0], y = point[1];
+    
+    var inside = false;
+    for (var i = 0, j = vs.length - 1; i < vs.length; j = i++) {
+        var xi = vs[i][0], yi = vs[i][1];
+        var xj = vs[j][0], yj = vs[j][1];
+        
+        var intersect = ((yi > y) != (yj > y))
+            && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+        if (intersect) inside = !inside;
+    }
+    
+    return inside;
+};
 
 
 </script>
