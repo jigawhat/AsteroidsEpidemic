@@ -6,7 +6,8 @@ body {
 }
 canvas {
     border: 1px solid #d3d3d3;
-    background-color: #f1f1f1;
+    background-color: #000000;
+/*    background-color: #f1f1f1;*/
 }
 </style>
 </head>
@@ -30,21 +31,21 @@ ctx.stroke();
 
 const WIDTH = 800;
 const HEIGHT = 600;
-const DOUGHNUT_MARGIN = 50;                  // Margin for doughnut-shaped universe looping
-const FRAMERATE = 50;                        // Game framerate
+const DOUGHNUT_MARGIN = 50;                   // Margin for doughnut-shaped universe looping
+const FRAMERATE = 50;                         // Game framerate
 const SHIP_SPEED = 0.1;
 const SHIP_TURN_SPEED = 7.5;
-const SAFE_SPAWN_DISTANCE = 150;             // Minimum distance from ship to asteroid spawn
+const SAFE_SPAWN_DISTANCE = 150;              // Minimum distance from ship to asteroid spawn
 const MISSILE_SPEED = 8.5;
 const MISSILE_LENGTH = 15;
-const MISSILE_LIFESPAN = 75;                 // Missile lifespan in frames
+const MISSILE_LIFESPAN = 75;                  // Missile lifespan in frames
 const ASTEROID_NUM_POINTS = 16;   
 const SMALL_ASTEROID_RADIUS = 20;
 const MEDIUM_ASTEROID_RADIUS = 37;
 const LARGE_ASTEROID_RADIUS = 55;
 const ASTEROID_ROTATE_SPEED = 0.005;
 const ASTEROID_SPEED = 1.0;
-const ASTEROID_MAXAGE = 7.0;                 // Maximum possible age before evolution
+const ASTEROID_MAXAGE = 10.0;                 // Maximum possible age before evolution
 const ASTEROID_EVOLUTION_TIMER = 2.1;
 const SMALL_ASTEROID_SPEED_MULTIPLIER = 2.0;
 const MEDIUM_ASTEROID_SPEED_MULTIPLIER = 1.4;
@@ -75,6 +76,7 @@ var myGameArea = {
     this.canvas.width = WIDTH;
     this.canvas.height = HEIGHT;
     this.context = this.canvas.getContext("2d");
+    this.context.strokeStyle = "white";
     document.body.insertBefore(this.canvas, document.body.childNodes[0]);
 
     // Setup frames
@@ -162,6 +164,7 @@ class Asteroid extends MovingObject {
     this.speedY = (Math.random() - 0.5) * 2.0 * ASTEROID_SPEED * speed_multiplier;
     this.moveAngle = (Math.random() - 0.5) * 2.0 * ASTEROID_ROTATE_SPEED * speed_multiplier;
 
+    // Initialise shape
     this.spoke_angle_offsets = [];
     this.spoke_radii_offsets = [];
     for (let i = 0; i < ASTEROID_NUM_POINTS; i++) {
@@ -276,6 +279,7 @@ class Ship extends MovingObject {
 
   constructor(x, y) {
     super(x, y);
+    this.coll_points = [[7, 7.5], [-7, 7.5], [0, -15]];
   }
   update() {
 
@@ -295,20 +299,33 @@ class Ship extends MovingObject {
     ctx.stroke();
 
     ctx.restore();
+
+    this.polygon = [];
+    for (let i = 0; i < this.coll_points.length; i++) {
+      var x = this.coll_points[i][0];
+      var y = this.coll_points[i][1];
+      var radius = Math.sqrt((x ** 2) + (y ** 2));
+      var angle = Math.atan(y/x);
+      angle += this.angle;
+      var new_x = Math.cos(angle) * radius;
+      var new_y = Math.sin(angle) * radius;
+      this.polygon.push([this.x + new_x, this.y + new_y]);
+    }
   }
 }
 
 // Update per frame function
 function updateGameArea() {
   myGameArea.clear();
-  ship.moveAngle = 0;
-
-  // Game control listeners
-  if (myGameArea.keys && myGameArea.keys[37]) {ship.moveAngle = -SHIP_TURN_SPEED * Math.PI / 180}
-  if (myGameArea.keys && myGameArea.keys[39]) {ship.moveAngle = SHIP_TURN_SPEED * Math.PI / 180}
-  if (myGameArea.keys && myGameArea.keys[38]) {
-    ship.speedX += SHIP_SPEED * Math.cos(ship.angle - (Math.PI / 2));
-    ship.speedY += SHIP_SPEED * Math.sin(ship.angle - (Math.PI / 2));
+  if (ship != null) {
+    ship.moveAngle = 0;
+    // Game control listeners
+    if (myGameArea.keys && myGameArea.keys[37]) {ship.moveAngle = -SHIP_TURN_SPEED * Math.PI / 180}
+    if (myGameArea.keys && myGameArea.keys[39]) {ship.moveAngle = SHIP_TURN_SPEED * Math.PI / 180}
+    if (myGameArea.keys && myGameArea.keys[38]) {
+      ship.speedX += SHIP_SPEED * Math.cos(ship.angle - (Math.PI / 2));
+      ship.speedY += SHIP_SPEED * Math.sin(ship.angle - (Math.PI / 2));
+    }
   }
 
   // Missile fire event listener
@@ -323,6 +340,10 @@ function updateGameArea() {
   }
 
   // Update object positions and call update function
+  if (ship != null) {
+    ship.newPos();
+    ship.update();
+  }
   for (let i = 0; i < asteroids.length; i++) {
     asteroids[i].newPos();
     var alen = asteroids.length;
@@ -331,7 +352,7 @@ function updateGameArea() {
       i--;
     }
   }
-  // Detect collisions
+  // Detect collisions between asteroids and missiles
   for (let i = 0; i < missiles.length; i++) {
     for (let j = 0; j < asteroids.length; j++) {
       if (!asteroids[j].polygon) {
@@ -339,31 +360,27 @@ function updateGameArea() {
       }
       if (inside([missiles[i].x, missiles[i].y], asteroids[j].polygon)) {
         // Spawn smaller asteroids
-        if (asteroids[j].state == "MEDIUM") {
-          asteroids.push(new Asteroid("SMALL",
-            asteroids[j].x + (Math.random() - 0.5) * 2.0 * MEDIUM_ASTEROID_RADIUS * 0.7,
-            asteroids[j].y + (Math.random() - 0.5) * 2.0 * MEDIUM_ASTEROID_RADIUS * 0.7))
-          asteroids.push(new Asteroid("SMALL",
-            asteroids[j].x + (Math.random() - 0.5) * 2.0 * MEDIUM_ASTEROID_RADIUS * 0.7,
-            asteroids[j].y + (Math.random() - 0.5) * 2.0 * MEDIUM_ASTEROID_RADIUS * 0.7))
-        } else if (asteroids[j].state == "LARGE") {
-          asteroids.push(new Asteroid("MEDIUM",
-            asteroids[j].x + (Math.random() - 0.5) * 2.0 * LARGE_ASTEROID_RADIUS * 0.7,
-            asteroids[j].y + (Math.random() - 0.5) * 2.0 * LARGE_ASTEROID_RADIUS * 0.7))
-          asteroids.push(new Asteroid("MEDIUM",
-            asteroids[j].x + (Math.random() - 0.5) * 2.0 * LARGE_ASTEROID_RADIUS * 0.7,
-            asteroids[j].y + (Math.random() - 0.5) * 2.0 * LARGE_ASTEROID_RADIUS * 0.7))
-        }
+        destroy_asteroid(j);
+        j--;
         // Adjust indexes for deleted missile
         for (let k = i + 1; k < missiles.length; k++) {
           missiles[k].missile_index--;
         }
         delete missiles[i];
         missiles.splice(i, 1);
-        delete asteroids[j];
-        asteroids.splice(j, 1);
         i--;
-        j--;
+      }
+    }
+  }
+  if (ship != null) {
+    for (let j = 0; j < asteroids.length; j++) {
+      for (let i = 0; i < ship.polygon.length; i++) {
+        if (inside(ship.polygon[i], asteroids[j].polygon)) {
+          ship = null;
+          destroy_asteroid(j);
+          j--;
+          break;
+        }
       }
     }
   }
@@ -375,8 +392,28 @@ function updateGameArea() {
       i--;
     }
   }
-  ship.newPos();
-  ship.update();
+}
+
+
+// Function to impact an asteroid
+function destroy_asteroid(j) {
+  if (asteroids[j].state == "MEDIUM") {
+    asteroids.push(new Asteroid("SMALL",
+      asteroids[j].x + (Math.random() - 0.5) * 2.0 * MEDIUM_ASTEROID_RADIUS * 0.7,
+      asteroids[j].y + (Math.random() - 0.5) * 2.0 * MEDIUM_ASTEROID_RADIUS * 0.7))
+    asteroids.push(new Asteroid("SMALL",
+      asteroids[j].x + (Math.random() - 0.5) * 2.0 * MEDIUM_ASTEROID_RADIUS * 0.7,
+      asteroids[j].y + (Math.random() - 0.5) * 2.0 * MEDIUM_ASTEROID_RADIUS * 0.7))
+  } else if (asteroids[j].state == "LARGE") {
+    asteroids.push(new Asteroid("MEDIUM",
+      asteroids[j].x + (Math.random() - 0.5) * 2.0 * LARGE_ASTEROID_RADIUS * 0.7,
+      asteroids[j].y + (Math.random() - 0.5) * 2.0 * LARGE_ASTEROID_RADIUS * 0.7))
+    asteroids.push(new Asteroid("MEDIUM",
+      asteroids[j].x + (Math.random() - 0.5) * 2.0 * LARGE_ASTEROID_RADIUS * 0.7,
+      asteroids[j].y + (Math.random() - 0.5) * 2.0 * LARGE_ASTEROID_RADIUS * 0.7))
+  }
+  delete asteroids[j];
+  asteroids.splice(j, 1);
 }
 
 
