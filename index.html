@@ -49,7 +49,10 @@ const ASTEROID_MAXAGE = 10.0;                 // Maximum possible age before evo
 const ASTEROID_EVOLUTION_TIMER = 2.1;
 const SMALL_ASTEROID_SPEED_MULTIPLIER = 2.0;
 const MEDIUM_ASTEROID_SPEED_MULTIPLIER = 1.4;
-
+const LINE_PARTICLE_ROTATE_SPEED = 0.05;
+const LINE_PARTICLE_SIZE = 12;
+const LINE_PARTICLE_SPEED = 2;
+const LINE_PARTICLE_LIFESPAN = 2.0;
 
 
 // Variables
@@ -57,6 +60,7 @@ const MEDIUM_ASTEROID_SPEED_MULTIPLIER = 1.4;
 var ship;
 var missiles = [];
 var asteroids = [];
+var line_particles = [];
 var firing = false;
 
 
@@ -131,6 +135,37 @@ class MovingObject {
   }
 }
 
+// Line particle effects class for when ship is destroyed
+class LineParticle extends MovingObject {
+  constructor(x, y, speedX, speedY, lp_index) {
+    super(x, y);
+    this.lp_index = lp_index;
+    this.speedX = speedX + Math.random() * LINE_PARTICLE_SPEED;
+    this.speedY = speedY + Math.random() * LINE_PARTICLE_SPEED;
+    this.moveAngle = Math.random() * LINE_PARTICLE_ROTATE_SPEED;
+    this.angle = Math.random() * Math.PI * 2;
+    this.framesTilDeath = 0.7 + (LINE_PARTICLE_LIFESPAN * FRAMERATE * Math.random());
+  }
+  update() {
+    // Draw line
+    var ctx = myGameArea.context;
+    var x = LINE_PARTICLE_SIZE * Math.cos(this.angle);
+    var y = LINE_PARTICLE_SIZE * Math.sin(this.angle);
+    ctx.beginPath()
+    ctx.moveTo(this.x + x, this.y + y);
+    ctx.lineTo(this.x - x, this.y - y);
+    ctx.stroke();
+    this.framesTilDeath--;
+    if (this.framesTilDeath <= 0) {
+      for (let i = this.lp_index + 1; i < line_particles.length; i++) {
+        line_particles[i].lp_index--;
+      }
+      delete line_particles[this.lp_index];
+      line_particles.splice(this.lp_index, 1);
+    }
+  }
+}
+
 // Asteroid class
 const angle_incr = 2 * Math.PI / ASTEROID_NUM_POINTS;
 class Asteroid extends MovingObject {
@@ -173,7 +208,7 @@ class Asteroid extends MovingObject {
     }
   }
 
-  update () {
+  update() {
     this.spoke_angles = [];
     this.spoke_radii = [];
     this.polygon_x = [];
@@ -317,7 +352,7 @@ class Ship extends MovingObject {
 // Update per frame function
 function updateGameArea() {
   myGameArea.clear();
-  if (ship != null) {
+  if (ship) {
     ship.moveAngle = 0;
     // Game control listeners
     if (myGameArea.keys && myGameArea.keys[37]) {ship.moveAngle = -SHIP_TURN_SPEED * Math.PI / 180}
@@ -340,9 +375,17 @@ function updateGameArea() {
   }
 
   // Update object positions and call update function
-  if (ship != null) {
+  if (ship) {
     ship.newPos();
     ship.update();
+  }
+  for (let i = 0; i < line_particles.length; i++) {
+    line_particles[i].newPos();
+    var lplen = line_particles.length;
+    line_particles[i].update();
+    if (lplen != line_particles.length) { // Line particle was deleted; adjust index
+      i--;
+    }
   }
   for (let i = 0; i < asteroids.length; i++) {
     asteroids[i].newPos();
@@ -372,10 +415,15 @@ function updateGameArea() {
       }
     }
   }
-  if (ship != null) {
+  // Detect ship collision
+  if (ship) {
     for (let j = 0; j < asteroids.length; j++) {
       for (let i = 0; i < ship.polygon.length; i++) {
         if (inside(ship.polygon[i], asteroids[j].polygon)) {
+          for (let k = 0; k < 3; k++) {
+            line_particles.push(new LineParticle(ship.x, ship.y,
+              ship.speedX / 40, ship.speedY / 40, line_particles.length));
+          }
           ship = null;
           destroy_asteroid(j);
           j--;
