@@ -53,6 +53,8 @@ const LINE_PARTICLE_ROTATE_SPEED = 0.05;
 const LINE_PARTICLE_SIZE = 12;
 const LINE_PARTICLE_SPEED = 2;
 const LINE_PARTICLE_LIFESPAN = 2.0;
+const PARTICLE_SPEED = 2;
+const PARTICLE_LIFESPAN = 2.0;
 
 
 // Variables
@@ -60,6 +62,7 @@ const LINE_PARTICLE_LIFESPAN = 2.0;
 var ship;
 var missiles = [];
 var asteroids = [];
+var particles = [];
 var line_particles = [];
 var firing = false;
 
@@ -132,6 +135,33 @@ class MovingObject {
     }
     this.x = new_x;
     this.y = new_y;
+  }
+}
+
+// Particle effects class for when asteroid is shot
+class Particle extends MovingObject {
+  constructor(x, y, speedX, speedY, p_index) {
+    super(x, y);
+    this.p_index = p_index;
+    this.speedX = speedX + Math.random() * PARTICLE_SPEED;
+    this.speedY = speedY + Math.random() * PARTICLE_SPEED;
+    this.framesTilDeath = 0.3 + (PARTICLE_LIFESPAN * FRAMERATE * Math.random());
+  }
+  update() {
+    // Draw particle
+    var ctx = myGameArea.context;
+    ctx.beginPath()
+    ctx.moveTo(this.x, this.y);
+    ctx.lineTo(this.x + 1, this.y);
+    ctx.stroke();
+    this.framesTilDeath--;
+    if (this.framesTilDeath <= 0) {
+      for (let i = this.p_index + 1; i < particles.length; i++) {
+        particles[i].p_index--;
+      }
+      delete particles[this.p_index];
+      particles.splice(this.p_index, 1);
+    }
   }
 }
 
@@ -379,6 +409,14 @@ function updateGameArea() {
     ship.newPos();
     ship.update();
   }
+  for (let i = 0; i < particles.length; i++) {
+    particles[i].newPos();
+    var plen = particles.length;
+    particles[i].update();
+    if (plen != particles.length) { // Particle was deleted; adjust index
+      i--;
+    }
+  }
   for (let i = 0; i < line_particles.length; i++) {
     line_particles[i].newPos();
     var lplen = line_particles.length;
@@ -402,6 +440,11 @@ function updateGameArea() {
         continue;  // Don't detect collisions for newly spawned asteroids
       }
       if (inside([missiles[i].x, missiles[i].y], asteroids[j].polygon)) {
+        // Spawn particle effects
+        for (let k = 0; k < 10; k++) {
+          particles.push(new Particle(missiles[i].x, missiles[i].y,
+            0, 0, particles.length));
+        }
         // Spawn smaller asteroids
         destroy_asteroid(j);
         j--;
@@ -420,9 +463,13 @@ function updateGameArea() {
     for (let j = 0; j < asteroids.length; j++) {
       for (let i = 0; i < ship.polygon.length; i++) {
         if (inside(ship.polygon[i], asteroids[j].polygon)) {
-          for (let k = 0; k < 3; k++) {
+          for (let k = 0; k < 3; k++) {  // Spawn particles effects
             line_particles.push(new LineParticle(ship.x, ship.y,
               ship.speedX / 40, ship.speedY / 40, line_particles.length));
+          }
+          for (let k = 0; k < 10; k++) {
+            particles.push(new Particle(ship.x, ship.y,
+              0, 0, particles.length));
           }
           ship = null;
           destroy_asteroid(j);
