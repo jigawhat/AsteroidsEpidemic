@@ -65,6 +65,7 @@ var asteroids = [];
 var particles = [];
 var line_particles = [];
 var firing = false;
+var frameCount = 0;
 
 
 // Initialise game
@@ -345,6 +346,7 @@ class Ship extends MovingObject {
   constructor(x, y) {
     super(x, y);
     this.coll_points = [[7, 7.5], [-7, 7.5], [0, -15]];
+    this.thrusting = false;
   }
   update() {
 
@@ -361,11 +363,18 @@ class Ship extends MovingObject {
     ctx.lineTo(-10, 15);
     ctx.moveTo(7, 7.5);
     ctx.lineTo(-7, 7.5);
+
+    if (this.thrusting && frameCount % 2 == 0) {
+      ctx.moveTo(-5, 7.5);
+      ctx.lineTo(0, 20);
+      ctx.lineTo(5, 7.5);
+    }
+
     ctx.stroke();
 
     ctx.restore();
 
-    this.polygon = [];
+    this.polygon = [];  // Compute collision polygon
     for (let i = 0; i < this.coll_points.length; i++) {
       var x = this.coll_points[i][0];
       var y = this.coll_points[i][1];
@@ -382,14 +391,17 @@ class Ship extends MovingObject {
 // Update per frame function
 function updateGameArea() {
   myGameArea.clear();
+  frameCount++;
   if (ship) {
     ship.moveAngle = 0;
+    ship.thrusting = false;
     // Game control listeners
     if (myGameArea.keys && myGameArea.keys[37]) {ship.moveAngle = -SHIP_TURN_SPEED * Math.PI / 180}
     if (myGameArea.keys && myGameArea.keys[39]) {ship.moveAngle = SHIP_TURN_SPEED * Math.PI / 180}
     if (myGameArea.keys && myGameArea.keys[38]) {
       ship.speedX += SHIP_SPEED * Math.cos(ship.angle - (Math.PI / 2));
       ship.speedY += SHIP_SPEED * Math.sin(ship.angle - (Math.PI / 2));
+      ship.thrusting = true;
     }
   }
 
