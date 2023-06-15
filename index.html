@@ -68,6 +68,7 @@ var particles = [];
 var line_particles = [];
 var mainmenu;
 var gameovermenu;
+var instructions;
 var firing = false;
 var respawning = false;
 var just_respawned = false;
@@ -509,6 +510,35 @@ class GameOverMenu {
   }
 }
 
+class Instructions {
+  update() {
+    // Draw instructions screen
+    var ctx = myGameArea.context;
+
+    ctx.font = "20px Arial";
+    ctx.fillText("The universal infection of growing asteroids has spread to the point of", 50, 50);
+    ctx.fillText("apocalypse. The united space command has issued the order to set off", 50, 75);
+    ctx.fillText("an ion bomb that will destroy 99.9% of universal life. You are the last", 50, 100);
+    ctx.fillText("fighter pilot deployed to destroy the asteroids before it is too late", 50, 125);
+    ctx.fillText("", 50, 150);
+    ctx.fillText("Control your ship using the arrow keys", 50, 200);
+    ctx.fillText("Fire using spacebar or Z", 50, 225);
+
+    // Draw button
+    ctx.font = "25px Verdana";
+    ctx.fillText("Main Menu", 337, 500);
+    ctx.strokeRect(300, 474, 205, 35);
+
+    if (myGameArea.mouseclick) {
+      if (myGameArea.x > 300 && myGameArea.x < 300 + 205 &&
+          myGameArea.y > 474 && myGameArea.y < 474 + 35) {
+        mode = "MAINMENU";
+        just_changed_mode = true;
+      }
+    }
+  }
+}
+
 function setup_game() {
   asteroids = [];
   ship = new Ship(WIDTH / 2, HEIGHT / 2);
@@ -525,7 +555,14 @@ function updateGameArea() {
       mainmenu = new MainMenu();
       just_changed_mode = false;
     } else {
-      mainmenu.update()
+      mainmenu.update();
+    }
+  } else if (mode == "INSTRUCTIONS") {
+    if (just_changed_mode) {
+      if (!instructions) instructions = new Instructions();
+      just_changed_mode = false;
+    } else {
+      instructions.update();
     }
   } else if (mode == "PLAYING") {
     if (just_changed_mode) {
