@@ -67,14 +67,17 @@ var asteroids = [];
 var particles = [];
 var line_particles = [];
 var mainmenu;
+var gameovermenu;
 var firing = false;
 var respawning = false;
 var just_respawned = false;
 var framesTilRespawn = 0;
 var framesTilProtectionEnds = 0;
 var lives_left = 3;
+var wave = 1;
 var mode = "MAINMENU";
 var just_changed_mode = true;
+var just_clicked = false;
 var frameCount = 0;
 
 
@@ -121,6 +124,7 @@ var myGameArea = {
     });
     window.addEventListener('mouseup', function (e) {
       myGameArea.mouseclick = false;
+      just_clicked = false;
     });
 
   },
@@ -459,14 +463,49 @@ class MainMenu {
     ctx.strokeRect(300, 324, 205, 35);
     ctx.strokeRect(300, 373, 205, 35);
 
+    if (myGameArea.mouseclick && !just_clicked) {
+      if (myGameArea.x > 300 && myGameArea.x < 300 + 205 &&
+          myGameArea.y > 324 && myGameArea.y < 324 + 35) {
+        mode = "PLAYING";
+        just_changed_mode = true;
+      } else if (myGameArea.x > 300 && myGameArea.x < 300 + 205 &&
+                 myGameArea.y > 373 && myGameArea.y < 373 + 35) {
+        mode = "INSTRUCTIONS";
+        just_changed_mode = true;
+      }
+    }
+
+  }
+}
+
+class GameOverMenu {
+  update() {
+    // Draw game over menu
+    var ctx = myGameArea.context;
+
+    // Draw game over text
+    ctx.font = "50px Arial";
+    ctx.fillText("Game Over", 285, 250);
+
+    // Draw buttons
+    ctx.font = "25px Verdana";
+    ctx.fillText("Play Again", 337, 350);
+    ctx.fillText("Main Menu", 337, 400);
+    ctx.strokeRect(300, 324, 205, 35);
+    ctx.strokeRect(300, 373, 205, 35);
+
     if (myGameArea.mouseclick) {
       if (myGameArea.x > 300 && myGameArea.x < 300 + 205 &&
           myGameArea.y > 324 && myGameArea.y < 324 + 35) {
         mode = "PLAYING";
         just_changed_mode = true;
+      } else if (myGameArea.x > 300 && myGameArea.x < 300 + 205 &&
+                 myGameArea.y > 373 && myGameArea.y < 373 + 35) {
+        mode = "MAINMENU";
+        just_changed_mode = true;
+        just_clicked = true;
       }
     }
-
   }
 }
 
@@ -483,9 +522,7 @@ function updateGameArea() {
 
   if (mode == "MAINMENU") {
     if (just_changed_mode) {
-      if (!mainmenu) {
-        mainmenu = new MainMenu();
-      }
+      mainmenu = new MainMenu();
       just_changed_mode = false;
     } else {
       mainmenu.update()
@@ -526,8 +563,14 @@ function updateGameArea() {
   
     // Draw lives left
     for (let i = 0; i < lives_left; i++) {
-      var x_ofs = i * 40;
-      draw_ship(50 + x_ofs, 100, 0, false);
+      draw_ship(50 + (i * 40), 100, 0, false);
+    }
+  } else if (mode == "GAMEOVER") {
+    if (just_changed_mode) {
+      if (!gameovermenu) gameovermenu = new GameOverMenu();
+      just_changed_mode = false;
+    } else {
+      gameovermenu.update();
     }
   }
 
