@@ -50,11 +50,11 @@ const ASTEROID_EVOLUTION_TIMER = 2.1;
 const SMALL_ASTEROID_SPEED_MULTIPLIER = 2.0;
 const MEDIUM_ASTEROID_SPEED_MULTIPLIER = 1.4;
 const LINE_PARTICLE_ROTATE_SPEED = 0.05;
+const PARTICLE_SPEED = 2;
+const PARTICLE_LIFESPAN = 2.0;
 const LINE_PARTICLE_SIZE = 12;
 const LINE_PARTICLE_SPEED = 2;
 const LINE_PARTICLE_LIFESPAN = 2.0;
-const PARTICLE_SPEED = 2;
-const PARTICLE_LIFESPAN = 2.0;
 
 
 // Variables
@@ -64,16 +64,20 @@ var missiles = [];
 var asteroids = [];
 var particles = [];
 var line_particles = [];
+var mainmenu;
 var firing = false;
+var mode = "MAINMENU";
+var just_changed_mode = true;
 var frameCount = 0;
 
 
 // Initialise game
 function startGame() {
   myGameArea.start();
-  ship = new Ship(10, 120);
-  test_asteroid = new Asteroid("MEDIUM", null, null);
-  asteroids.push(test_asteroid);
+  // Debug code
+  // ship = new Ship(10, 120);
+  // test_asteroid = new Asteroid("MEDIUM", null, null);
+  // asteroids.push(test_asteroid);
 }
 
 var myGameArea = {
@@ -388,14 +392,68 @@ class Ship extends MovingObject {
   }
 }
 
+// Class for main menu text and buttons
+class MainMenu {
+  constructor() {
+    // Spawn background asteroids
+    asteroids.push(new Asteroid("LARGE", null, null));
+    asteroids.push(new Asteroid("LARGE", null, null));
+    asteroids.push(new Asteroid("LARGE", null, null));
+    asteroids.push(new Asteroid("LARGE", null, null));
+    asteroids.push(new Asteroid("MEDIUM", null, null));
+    asteroids.push(new Asteroid("MEDIUM", null, null));
+    asteroids.push(new Asteroid("MEDIUM", null, null));
+    asteroids.push(new Asteroid("MEDIUM", null, null));
+    asteroids.push(new Asteroid("MEDIUM", null, null));
+    asteroids.push(new Asteroid("SMALL", null, null));
+    asteroids.push(new Asteroid("SMALL", null, null));
+    asteroids.push(new Asteroid("SMALL", null, null));
+    asteroids.push(new Asteroid("SMALL", null, null));
+    asteroids.push(new Asteroid("SMALL", null, null));
+    asteroids.push(new Asteroid("SMALL", null, null));
+    asteroids.push(new Asteroid("SMALL", null, null));
+  }
+
+  update() {
+
+    // Draw main menu
+    var ctx = myGameArea.context;
+
+    // Draw title text
+    ctx.font = "75px Verdana";
+    ctx.fillStyle = "white";
+    ctx.fillText("Asteroids:", 220, 200);
+    ctx.font = "50px Arial";
+    ctx.fillText("Epidemic", 300, 250);
+
+    // Draw buttons
+    ctx.font = "25px Verdana";
+    ctx.fillText("Play", 375, 350);
+    ctx.fillText("Instructions", 330, 400);
+    ctx.strokeRect(300, 324, 205, 35);
+    ctx.strokeRect(300, 373, 205, 35);
+  }
+}
+
 // Update per frame function
 function updateGameArea() {
   myGameArea.clear();
   frameCount++;
+
+  if (mode == "MAINMENU") {
+    if (just_changed_mode) {
+      mainmenu = new MainMenu();
+      just_changed_mode = false;
+    } else {
+      mainmenu.update()
+    }
+  }
+
+
+  // Game control listeners
   if (ship) {
     ship.moveAngle = 0;
     ship.thrusting = false;
-    // Game control listeners
     if (myGameArea.keys && myGameArea.keys[37]) {ship.moveAngle = -SHIP_TURN_SPEED * Math.PI / 180}
     if (myGameArea.keys && myGameArea.keys[39]) {ship.moveAngle = SHIP_TURN_SPEED * Math.PI / 180}
     if (myGameArea.keys && myGameArea.keys[38]) {
