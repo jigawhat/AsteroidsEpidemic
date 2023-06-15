@@ -36,6 +36,8 @@ const FRAMERATE = 50;                         // Game framerate
 const SHIP_SPEED = 0.1;
 const SHIP_TURN_SPEED = 7.5;
 const SAFE_SPAWN_DISTANCE = 150;              // Minimum distance from ship to asteroid spawn
+const RESPAWN_TIMER = 3.0;                    // Seconds before respawning ship
+const RESPAWN_PROTECTION_TIMER = 2.5;         // Seconds ship is invulnerable after spawning
 const MISSILE_SPEED = 8.5;
 const MISSILE_LENGTH = 15;
 const MISSILE_LIFESPAN = 75;                  // Missile lifespan in frames
@@ -66,6 +68,11 @@ var particles = [];
 var line_particles = [];
 var mainmenu;
 var firing = false;
+var respawning = false;
+var just_respawned = false;
+var framesTilRespawn = 0;
+var framesTilProtectionEnds = 0;
+var lives_left = 3;
 var mode = "MAINMENU";
 var just_changed_mode = true;
 var frameCount = 0;
@@ -99,10 +106,23 @@ var myGameArea = {
       myGameArea.keys = (myGameArea.keys || []);
       myGameArea.keys[e.keyCode] = true;
       // alert("Key " + e.keyCode + " pressed.");
-    })
+    });
     window.addEventListener('keyup', function (e) {
       myGameArea.keys[e.keyCode] = false;
-    })
+    });
+
+    // Add mouse event listeners for menu buttons
+    window.addEventListener('mousemove', function (e) {
+      myGameArea.x = e.pageX;
+      myGameArea.y = e.pageY;
+    });
+    window.addEventListener('mousedown', function (e) {
+      myGameArea.mouseclick = true;
+    });
+    window.addEventListener('mouseup', function (e) {
+      myGameArea.mouseclick = false;
+    });
+
   },
 
   // Refresh screen
@@ -344,6 +364,31 @@ class Missile extends MovingObject {
   }
 }
 
+function draw_ship(x, y, angle, thrusting) {
+  var ctx = myGameArea.context;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+
+  // ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(10, 15);
+  ctx.lineTo(0, -15);
+  ctx.lineTo(-10, 15);
+  ctx.moveTo(7, 7.5);
+  ctx.lineTo(-7, 7.5);
+
+  if (thrusting && frameCount % 2 == 0) {
+    ctx.moveTo(-5, 7.5);
+    ctx.lineTo(0, 20);
+    ctx.lineTo(5, 7.5);
+  }
+
+  ctx.stroke();
+
+  ctx.restore();
+}
+
 // Player spaceship class
 class Ship extends MovingObject {
 
@@ -354,29 +399,10 @@ class Ship extends MovingObject {
   }
   update() {
 
-    // Draw spaceship
-    var ctx = myGameArea.context;
-    ctx.save();
-    ctx.translate(this.x, this.y);
-    ctx.rotate(this.angle);
-
-    // ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.moveTo(10, 15);
-    ctx.lineTo(0, -15);
-    ctx.lineTo(-10, 15);
-    ctx.moveTo(7, 7.5);
-    ctx.lineTo(-7, 7.5);
-
-    if (this.thrusting && frameCount % 2 == 0) {
-      ctx.moveTo(-5, 7.5);
-      ctx.lineTo(0, 20);
-      ctx.lineTo(5, 7.5);
+    if ((!just_respawned) || frameCount % 2 == 0) {
+      // Draw spaceship
+      draw_ship(this.x, this.y, this.angle, this.thrusting);
     }
-
-    ctx.stroke();
-
-    ctx.restore();
 
     this.polygon = [];  // Compute collision polygon
     for (let i = 0; i < this.coll_points.length; i++) {
@@ -432,7 +458,22 @@ class MainMenu {
     ctx.fillText("Instructions", 330, 400);
     ctx.strokeRect(300, 324, 205, 35);
     ctx.strokeRect(300, 373, 205, 35);
+
+    if (myGameArea.mouseclick) {
+      if (myGameArea.x > 300 && myGameArea.x < 300 + 205 &&
+          myGameArea.y > 324 && myGameArea.y < 324 + 35) {
+        mode = "PLAYING";
+        just_changed_mode = true;
+      }
+    }
+
   }
+}
+
+function setup_game() {
+  asteroids = [];
+  ship = new Ship(WIDTH / 2, HEIGHT / 2);
+  asteroids.push(new Asteroid("LARGE", null, null))
 }
 
 // Update per frame function
@@ -442,10 +483,51 @@ function updateGameArea() {
 
   if (mode == "MAINMENU") {
     if (just_changed_mode) {
-      mainmenu = new MainMenu();
+      if (!mainmenu) {
+        mainmenu = new MainMenu();
+      }
       just_changed_mode = false;
     } else {
       mainmenu.update()
+    }
+  } else if (mode == "PLAYING") {
+    if (just_changed_mode) {
+      setup_game();
+      just_changed_mode = false;
+    } else {
+      // Check for ship death
+      if (!ship) {
+        if (lives_left > 0) {
+          if (!respawning) {
+            respawning = true;
+            framesTilRespawn = RESPAWN_TIMER * FRAMERATE;
+          } else {
+            framesTilRespawn--;
+            if (framesTilRespawn <= 0) {
+              respawning = false;
+              just_respawned = true;
+              framesTilProtectionEnds = RESPAWN_PROTECTION_TIMER * FRAMERATE;
+              lives_left--;
+              ship = new Ship(WIDTH / 2, HEIGHT / 2);
+            }
+          }
+        } else {
+          mode = "GAMEOVER";
+          just_changed_mode = true;
+        }
+      }
+      if (just_respawned) {
+        framesTilProtectionEnds--;
+        if (framesTilProtectionEnds <= 0) {
+          just_respawned = false;
+        }
+      }
+    }
+  
+    // Draw lives left
+    for (let i = 0; i < lives_left; i++) {
+      var x_ofs = i * 40;
+      draw_ship(50 + x_ofs, 100, 0, false);
     }
   }
 
@@ -529,7 +611,7 @@ function updateGameArea() {
     }
   }
   // Detect ship collision
-  if (ship) {
+  if (ship && (!just_respawned)) {
     for (let j = 0; j < asteroids.length; j++) {
       for (let i = 0; i < ship.polygon.length; i++) {
         if (inside(ship.polygon[i], asteroids[j].polygon)) {
