@@ -38,6 +38,8 @@ const SHIP_TURN_SPEED = 7.5;
 const SAFE_SPAWN_DISTANCE = 150;              // Minimum distance from ship to asteroid spawn
 const RESPAWN_TIMER = 3.0;                    // Seconds before respawning ship
 const RESPAWN_PROTECTION_TIMER = 2.5;         // Seconds ship is invulnerable after spawning
+const WAVE_COOLDOWN = 3.0;                    // Seconds before next wave spawns
+const WAVE_TEXT_FADEOUT_TIMER = 3.0;          // Seconds over which to fadeout wave X text
 const MISSILE_SPEED = 8.5;
 const MISSILE_LENGTH = 15;
 const MISSILE_LIFESPAN = 75;                  // Missile lifespan in frames
@@ -72,8 +74,11 @@ var instructions;
 var firing = false;
 var respawning = false;
 var just_respawned = false;
+var wave_ended = false;
 var framesTilRespawn = 0;
 var framesTilProtectionEnds = 0;
+var framesTilNextWave = 0;
+var framesSinceWaveStart = 0;
 var lives_left = 3;
 var wave = 1;
 var mode = "MAINMENU";
@@ -464,6 +469,7 @@ class MainMenu {
     ctx.strokeRect(300, 324, 205, 35);
     ctx.strokeRect(300, 373, 205, 35);
 
+    // Detect mouse click
     if (myGameArea.mouseclick && !just_clicked) {
       if (myGameArea.x > 300 && myGameArea.x < 300 + 205 &&
           myGameArea.y > 324 && myGameArea.y < 324 + 35) {
@@ -495,6 +501,7 @@ class GameOverMenu {
     ctx.strokeRect(300, 324, 205, 35);
     ctx.strokeRect(300, 373, 205, 35);
 
+    // Detect mouse click
     if (myGameArea.mouseclick) {
       if (myGameArea.x > 300 && myGameArea.x < 300 + 205 &&
           myGameArea.y > 324 && myGameArea.y < 324 + 35) {
@@ -529,6 +536,7 @@ class Instructions {
     ctx.fillText("Main Menu", 337, 500);
     ctx.strokeRect(300, 474, 205, 35);
 
+    // Detect mouse click
     if (myGameArea.mouseclick) {
       if (myGameArea.x > 300 && myGameArea.x < 300 + 205 &&
           myGameArea.y > 474 && myGameArea.y < 474 + 35) {
@@ -541,8 +549,11 @@ class Instructions {
 
 function setup_game() {
   asteroids = [];
+  wave = 1;
+  framesSinceWaveStart = 0;
+  lives_left = 3;
   ship = new Ship(WIDTH / 2, HEIGHT / 2);
-  asteroids.push(new Asteroid("LARGE", null, null))
+  asteroids.push(new Asteroid("LARGE", null, null));
 }
 
 // Update per frame function
@@ -602,6 +613,40 @@ function updateGameArea() {
     for (let i = 0; i < lives_left; i++) {
       draw_ship(50 + (i * 40), 100, 0, false);
     }
+
+    // Check for wave elimination
+    if (asteroids.length == 0) {
+      if (!wave_ended) {
+        wave_ended = true;
+        framesTilNextWave = WAVE_COOLDOWN * FRAMERATE;
+      } else {
+        framesTilNextWave--;
+        if (framesTilNextWave == 0) {  // Spawn next wave
+          wave_ended = false;
+          wave++;
+          framesSinceWaveStart = 0;
+          if (wave == 2) {
+            for (let i = 0; i < 2; i++) {asteroids.push(new Asteroid("LARGE", null, null))};
+          } else if (wave == 3) {
+            for (let i = 0; i < 3; i++) {asteroids.push(new Asteroid("LARGE", null, null))};
+          } else {
+            for (let i = 0; i < wave; i++) {asteroids.push(new Asteroid("LARGE", null, null))};
+          }
+        }
+      }
+    }
+
+    // Draw wave text
+    framesSinceWaveStart++;
+    if (framesSinceWaveStart < WAVE_TEXT_FADEOUT_TIMER * FRAMERATE) {
+      var ctx = myGameArea.context;
+      ctx.fillStyle = "rgba(255, 255, 255, " + (1.0 - 
+        (framesSinceWaveStart / (WAVE_TEXT_FADEOUT_TIMER * FRAMERATE))) + ")";
+      ctx.font = "25px Verdana";
+      ctx.fillText("Wave " + wave, 360, 240);
+      ctx.fillStyle = "white";
+    }
+
   } else if (mode == "GAMEOVER") {
     if (just_changed_mode) {
       if (!gameovermenu) gameovermenu = new GameOverMenu();
