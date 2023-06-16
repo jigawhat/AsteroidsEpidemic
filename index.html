@@ -84,6 +84,7 @@ var framesTilBoom = 0;
 var framesSinceWaveStart = 0;
 var lives_left = 3;
 var wave = 1;
+var score = 0;
 var frameCount = 0;
 var mode = "MAINMENU";
 
@@ -483,6 +484,8 @@ class GameOverMenu {
     // Draw game over text
     ctx.font = "50px Arial";
     ctx.fillText("Game Over", 285, 250);
+    ctx.font = "25px Verdana";
+    ctx.fillText("Wave " + wave, 360, 290);
 
     // Draw buttons
     ctx.font = "25px Verdana";
@@ -540,6 +543,7 @@ class Instructions {
 function setup_game() {
   asteroids = [];
   wave = 1;
+  score = 0;
   lives_left = 3;
   framesSinceWaveStart = 0;
   framesTilBoom = 15 * FRAMERATE;
@@ -618,14 +622,33 @@ function updateGameArea() {
           framesSinceWaveStart = 0;
           if (wave == 2) {
             for (let i = 0; i < 2; i++) { asteroids.push(new Asteroid("LARGE", null, null)); }
-            framesTilBoom = 20 * FRAMERATE;
+            framesTilBoom = 30 * FRAMERATE;
           } else if (wave == 3) {
             for (let i = 0; i < 3; i++) { asteroids.push(new Asteroid("LARGE", null, null)); }
-            framesTilBoom = 25 * FRAMERATE;
+            framesTilBoom = 45 * FRAMERATE;
+          } else if (wave == 4) {
+            for (let i = 0; i < 4; i++) { asteroids.push(new Asteroid("LARGE", null, null)); }
+            framesTilBoom = 60 * FRAMERATE;
+          } else if (wave == 5) {
+            for (let i = 0; i < 5; i++) { asteroids.push(new Asteroid("LARGE", null, null)); }
+            framesTilBoom = 85 * FRAMERATE;
+          } else if (wave == 6) {
+            for (let i = 0; i < 6; i++) { asteroids.push(new Asteroid("LARGE", null, null)); }
+            framesTilBoom = 100 * FRAMERATE;
+          } else if (wave == 7) {
+            for (let i = 0; i < 7; i++) { asteroids.push(new Asteroid("LARGE", null, null)); }
+            framesTilBoom = 100 * FRAMERATE;
+          } else if (wave == 8) {
+            for (let i = 0; i < 7; i++) { asteroids.push(new Asteroid("LARGE", null, null)); }
+            framesTilBoom = 85 * FRAMERATE;
           } else {
-            for (let i = 0; i < wave; i++) { asteroids.push(new Asteroid("LARGE", null, null)); }
-            framesTilBoom = 35 * FRAMERATE;
+            for (let i = 0; i < 7; i++) { asteroids.push(new Asteroid("LARGE", null, null)); }
+            framesTilBoom = 70 * FRAMERATE;
           }
+          // } else {
+          //   for (let i = 0; i < wave; i++) { asteroids.push(new Asteroid("LARGE", null, null)); }
+          //   framesTilBoom = 85 * FRAMERATE;
+          // }
         }
       }
     }
@@ -687,6 +710,13 @@ function updateGameArea() {
     } else {
       gameovermenu.update();
     }
+  }
+
+  // Draw score
+  if (mode == "PLAYING" || mode == "GAMEOVER") {
+    var ctx = myGameArea.context;
+    ctx.font = "40px Courier";
+    ctx.fillText("" + score, 42, 55);
   }
 
 
@@ -803,6 +833,7 @@ function updateGameArea() {
 // Function to impact an asteroid
 function destroy_asteroid(j) {
   if (asteroids[j].state == "MEDIUM") {
+    score += 50;
     asteroids.push(new Asteroid("SMALL",
       asteroids[j].x + (Math.random() - 0.5) * 2.0 * MEDIUM_ASTEROID_RADIUS * 0.7,
       asteroids[j].y + (Math.random() - 0.5) * 2.0 * MEDIUM_ASTEROID_RADIUS * 0.7))
@@ -810,12 +841,15 @@ function destroy_asteroid(j) {
       asteroids[j].x + (Math.random() - 0.5) * 2.0 * MEDIUM_ASTEROID_RADIUS * 0.7,
       asteroids[j].y + (Math.random() - 0.5) * 2.0 * MEDIUM_ASTEROID_RADIUS * 0.7))
   } else if (asteroids[j].state == "LARGE") {
+    score += 20;
     asteroids.push(new Asteroid("MEDIUM",
       asteroids[j].x + (Math.random() - 0.5) * 2.0 * LARGE_ASTEROID_RADIUS * 0.7,
       asteroids[j].y + (Math.random() - 0.5) * 2.0 * LARGE_ASTEROID_RADIUS * 0.7))
     asteroids.push(new Asteroid("MEDIUM",
       asteroids[j].x + (Math.random() - 0.5) * 2.0 * LARGE_ASTEROID_RADIUS * 0.7,
       asteroids[j].y + (Math.random() - 0.5) * 2.0 * LARGE_ASTEROID_RADIUS * 0.7))
+  } else {
+    score += 100;
   }
   delete asteroids[j];
   asteroids.splice(j, 1);
