@@ -36,7 +36,7 @@ const FRAMERATE = 50;                         // Game framerate
 const SHIP_SPEED = 0.1;
 const SHIP_TURN_SPEED = 7.5;
 const SAFE_SPAWN_DISTANCE = 150;              // Minimum distance from ship to asteroid spawn
-const RESPAWN_TIMER = 3.0;                    // Seconds before respawning ship
+const RESPAWN_TIMER = 2.0;                    // Seconds before respawning ship
 const RESPAWN_PROTECTION_TIMER = 2.5;         // Seconds ship is invulnerable after spawning
 const WAVE_COOLDOWN = 3.0;                    // Seconds before next wave spawns
 const WAVE_TEXT_FADEOUT_TIMER = 3.0;          // Seconds over which to fadeout wave X text
@@ -75,16 +75,17 @@ var firing = false;
 var respawning = false;
 var just_respawned = false;
 var wave_ended = false;
+var just_changed_mode = true;
+var just_clicked = false;
 var framesTilRespawn = 0;
 var framesTilProtectionEnds = 0;
 var framesTilNextWave = 0;
+var framesTilBoom = 0;
 var framesSinceWaveStart = 0;
 var lives_left = 3;
 var wave = 1;
-var mode = "MAINMENU";
-var just_changed_mode = true;
-var just_clicked = false;
 var frameCount = 0;
+var mode = "MAINMENU";
 
 
 // Initialise game
@@ -432,22 +433,10 @@ class Ship extends MovingObject {
 class MainMenu {
   constructor() {
     // Spawn background asteroids
-    asteroids.push(new Asteroid("LARGE", null, null));
-    asteroids.push(new Asteroid("LARGE", null, null));
-    asteroids.push(new Asteroid("LARGE", null, null));
-    asteroids.push(new Asteroid("LARGE", null, null));
-    asteroids.push(new Asteroid("MEDIUM", null, null));
-    asteroids.push(new Asteroid("MEDIUM", null, null));
-    asteroids.push(new Asteroid("MEDIUM", null, null));
-    asteroids.push(new Asteroid("MEDIUM", null, null));
-    asteroids.push(new Asteroid("MEDIUM", null, null));
-    asteroids.push(new Asteroid("SMALL", null, null));
-    asteroids.push(new Asteroid("SMALL", null, null));
-    asteroids.push(new Asteroid("SMALL", null, null));
-    asteroids.push(new Asteroid("SMALL", null, null));
-    asteroids.push(new Asteroid("SMALL", null, null));
-    asteroids.push(new Asteroid("SMALL", null, null));
-    asteroids.push(new Asteroid("SMALL", null, null));
+    asteroids = [];
+    for (let i = 0; i < 4; i++) { asteroids.push(new Asteroid("LARGE", null, null)); }
+    for (let i = 0; i < 5; i++) { asteroids.push(new Asteroid("MEDIUM", null, null)); }
+    for (let i = 0; i < 7; i++) { asteroids.push(new Asteroid("SMALL", null, null)); }
   }
 
   update() {
@@ -475,6 +464,7 @@ class MainMenu {
           myGameArea.y > 324 && myGameArea.y < 324 + 35) {
         mode = "PLAYING";
         just_changed_mode = true;
+        mainmenu = null;
       } else if (myGameArea.x > 300 && myGameArea.x < 300 + 205 &&
                  myGameArea.y > 373 && myGameArea.y < 373 + 35) {
         mode = "INSTRUCTIONS";
@@ -526,7 +516,7 @@ class Instructions {
     ctx.fillText("The universal infection of growing asteroids has spread to the point of", 50, 50);
     ctx.fillText("apocalypse. The united space command has issued the order to set off", 50, 75);
     ctx.fillText("an ion bomb that will destroy 99.9% of universal life. You are the last", 50, 100);
-    ctx.fillText("fighter pilot deployed to destroy the asteroids before it is too late", 50, 125);
+    ctx.fillText("fighter pilot deployed to destroy the asteroids before it is too late.", 50, 125);
     ctx.fillText("", 50, 150);
     ctx.fillText("Control your ship using the arrow keys", 50, 200);
     ctx.fillText("Fire using spacebar or Z", 50, 225);
@@ -550,8 +540,9 @@ class Instructions {
 function setup_game() {
   asteroids = [];
   wave = 1;
-  framesSinceWaveStart = 0;
   lives_left = 3;
+  framesSinceWaveStart = 0;
+  framesTilBoom = 15 * FRAMERATE;
   ship = new Ship(WIDTH / 2, HEIGHT / 2);
   asteroids.push(new Asteroid("LARGE", null, null));
 }
@@ -563,7 +554,7 @@ function updateGameArea() {
 
   if (mode == "MAINMENU") {
     if (just_changed_mode) {
-      mainmenu = new MainMenu();
+      if (!mainmenu) mainmenu = new MainMenu();
       just_changed_mode = false;
     } else {
       mainmenu.update();
@@ -626,11 +617,14 @@ function updateGameArea() {
           wave++;
           framesSinceWaveStart = 0;
           if (wave == 2) {
-            for (let i = 0; i < 2; i++) {asteroids.push(new Asteroid("LARGE", null, null))};
+            for (let i = 0; i < 2; i++) { asteroids.push(new Asteroid("LARGE", null, null)); }
+            framesTilBoom = 20 * FRAMERATE;
           } else if (wave == 3) {
-            for (let i = 0; i < 3; i++) {asteroids.push(new Asteroid("LARGE", null, null))};
+            for (let i = 0; i < 3; i++) { asteroids.push(new Asteroid("LARGE", null, null)); }
+            framesTilBoom = 25 * FRAMERATE;
           } else {
-            for (let i = 0; i < wave; i++) {asteroids.push(new Asteroid("LARGE", null, null))};
+            for (let i = 0; i < wave; i++) { asteroids.push(new Asteroid("LARGE", null, null)); }
+            framesTilBoom = 35 * FRAMERATE;
           }
         }
       }
@@ -646,6 +640,45 @@ function updateGameArea() {
       ctx.fillText("Wave " + wave, 360, 240);
       ctx.fillStyle = "white";
     }
+
+    // Check for boom condition
+    if (asteroids.length > 0) {
+      framesTilBoom--;
+    }
+    if (framesTilBoom <= 0) {
+      // Destroy all asteroids and ship
+      for (let i = 0; i < asteroids.length; i++) {
+        for (let k = 0; k < 10; k++) {
+          particles.push(new Particle(asteroids[i].x, asteroids[i].y,
+            0, 0, particles.length));
+        }
+      }
+      asteroids = [];
+      for (let k = 0; k < 3; k++) {
+        line_particles.push(new LineParticle(ship.x, ship.y,
+          ship.speedX / 40, ship.speedY / 40, line_particles.length));
+      }
+      for (let k = 0; k < 10; k++) {
+        particles.push(new Particle(ship.x, ship.y,
+          0, 0, particles.length));
+      }
+      ship = null;
+      mode = "GAMEOVER";
+      just_changed_mode = true;
+    }
+
+    // Draw bomb
+    var ctx = myGameArea.context;
+    ctx.beginPath();
+    ctx.arc(720, 75, 40, -(1/2) * Math.PI, ((3/2) * Math.PI) - 0.4);
+    ctx.moveTo(720, 36);
+    ctx.lineTo(719, 26);
+    ctx.lineTo(702, 29);
+    ctx.lineTo(706, 39);
+    ctx.stroke();
+    ctx.font = "45px Courier";
+    var text = '' + Math.floor(framesTilBoom / FRAMERATE);
+    ctx.fillText(text, 707 - (text.length >= 2 ? 13 : 0), 87);
 
   } else if (mode == "GAMEOVER") {
     if (just_changed_mode) {
