@@ -40,6 +40,7 @@ const RESPAWN_TIMER = 2.0;                    // Seconds before respawning ship
 const RESPAWN_PROTECTION_TIMER = 2.5;         // Seconds ship is invulnerable after spawning
 const WAVE_COOLDOWN = 3.0;                    // Seconds before next wave spawns
 const WAVE_TEXT_FADEOUT_TIMER = 3.0;          // Seconds over which to fadeout wave X text
+const NEW_LIFE_SCORE = 10000;                 // Issue new life every time this score is reached
 const MISSILE_SPEED = 8.5;
 const MISSILE_LENGTH = 15;
 const MISSILE_LIFESPAN = 75;                  // Missile lifespan in frames
@@ -75,13 +76,14 @@ var firing = false;
 var respawning = false;
 var just_respawned = false;
 var wave_ended = false;
-var just_changed_mode = true;
 var just_clicked = false;
+var just_changed_mode = true;
 var framesTilRespawn = 0;
 var framesTilProtectionEnds = 0;
 var framesTilNextWave = 0;
 var framesTilBoom = 0;
 var framesSinceWaveStart = 0;
+var new_life_score = NEW_LIFE_SCORE;
 var lives_left = 3;
 var wave = 1;
 var score = 0;
@@ -703,6 +705,12 @@ function updateGameArea() {
     var text = '' + Math.floor(framesTilBoom / FRAMERATE);
     ctx.fillText(text, 707 - (text.length >= 2 ? 13 : 0), 87);
 
+    // Check for new life condition
+    if (score >= new_life_score) {
+      lives_left += 1;
+      new_life_score += NEW_LIFE_SCORE;
+    }
+
   } else if (mode == "GAMEOVER") {
     if (just_changed_mode) {
       if (!gameovermenu) gameovermenu = new GameOverMenu();
@@ -735,7 +743,7 @@ function updateGameArea() {
 
   // Missile fire event listener
   if (myGameArea.keys && (myGameArea.keys[32] || myGameArea.keys[90])) {
-    if (!firing) {
+    if ((!firing) && ship) {
       firing = true;
       missiles.push(new Missile(ship.x, ship.y, ship.angle - Math.PI / 2,
         ship.speedX, ship.speedY, missiles.length));
@@ -775,11 +783,14 @@ function updateGameArea() {
   }
   // Detect collisions between asteroids and missiles
   for (let i = 0; i < missiles.length; i++) {
+    if (!missiles[i]) {
+      continue;
+    }
     for (let j = 0; j < asteroids.length; j++) {
       if (!asteroids[j].polygon) {
         continue;  // Don't detect collisions for newly spawned asteroids
       }
-      if (inside([missiles[i].x, missiles[i].y], asteroids[j].polygon)) {
+      if (missiles[i] && inside([missiles[i].x, missiles[i].y], asteroids[j].polygon)) {
         // Spawn particle effects
         for (let k = 0; k < 10; k++) {
           particles.push(new Particle(missiles[i].x, missiles[i].y,
@@ -801,6 +812,9 @@ function updateGameArea() {
   // Detect ship collision
   if (ship && (!just_respawned)) {
     for (let j = 0; j < asteroids.length; j++) {
+      if (!asteroids[j].polygon) {
+        continue;  // Don't detect collisions for newly spawned asteroids
+      }
       for (let i = 0; i < ship.polygon.length; i++) {
         if (inside(ship.polygon[i], asteroids[j].polygon)) {
           for (let k = 0; k < 3; k++) {  // Spawn particles effects
@@ -816,6 +830,9 @@ function updateGameArea() {
           j--;
           break;
         }
+      }
+      if (!ship) {
+        break
       }
     }
   }
