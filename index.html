@@ -109,6 +109,10 @@ var myGameArea = {
     this.canvas.height = HEIGHT;
     this.context = this.canvas.getContext("2d");
     this.context.strokeStyle = "white";
+    var rect = this.canvas.getBoundingClientRect();
+    // console.log(rect.left + ' ' + rect.top);
+    // console.log(this.canvas.clientLeft + ' ' + this.canvas.clientTop);
+    // console.log(this.canvas.clientX + ' ' + this.canvas.clientY);
     document.body.insertBefore(this.canvas, document.body.childNodes[0]);
 
     // Setup frames
@@ -126,15 +130,13 @@ var myGameArea = {
 
     // Add mouse event listeners for menu buttons
     window.addEventListener('mousemove', function (e) {
-      myGameArea.x = e.pageX;
-      myGameArea.y = e.pageY;
+      myGameArea.x = e.pageX - rect.left;
+      myGameArea.y = e.pageY - rect.top;
     });
     window.addEventListener('mousedown', function (e) {
       myGameArea.mouseclick = true;
     });
     window.addEventListener('mouseup', function (e) {
-      myGameArea.mouseclick = false;
-      just_clicked = false;
     });
 
   },
@@ -463,13 +465,19 @@ class MainMenu {
 
     // Detect mouse click
     if (myGameArea.mouseclick && !just_clicked) {
-      if (myGameArea.x > 300 && myGameArea.x < 300 + 205 &&
-          myGameArea.y > 324 && myGameArea.y < 324 + 35) {
+      // for (let k = 0; k < 10; k++) {
+      //   particles.push(new Particle(myGameArea.x, myGameArea.y,
+      //     0, 0, particles.length));
+      // }
+      // if (myGameArea.x > 300 && myGameArea.x < 300 + 205 &&
+      //     myGameArea.y > 324 && myGameArea.y < 324 + 35) {
+      if (myGameArea.y > 324 && myGameArea.y < 324 + 35) {
         mode = "PLAYING";
         just_changed_mode = true;
         mainmenu = null;
-      } else if (myGameArea.x > 300 && myGameArea.x < 300 + 205 &&
-                 myGameArea.y > 373 && myGameArea.y < 373 + 35) {
+      // } else if (myGameArea.x > 300 && myGameArea.x < 300 + 205 &&
+      //            myGameArea.y > 373 && myGameArea.y < 373 + 35) {
+      } else if (myGameArea.y > 373 && myGameArea.y < 373 + 35) {
         mode = "INSTRUCTIONS";
         just_changed_mode = true;
       }
@@ -498,12 +506,14 @@ class GameOverMenu {
 
     // Detect mouse click
     if (myGameArea.mouseclick) {
-      if (myGameArea.x > 300 && myGameArea.x < 300 + 205 &&
-          myGameArea.y > 324 && myGameArea.y < 324 + 35) {
+      // if (myGameArea.x > 300 && myGameArea.x < 300 + 205 &&
+      //     myGameArea.y > 324 && myGameArea.y < 324 + 35) {
+      if (myGameArea.y > 324 && myGameArea.y < 324 + 35) {
         mode = "PLAYING";
         just_changed_mode = true;
-      } else if (myGameArea.x > 300 && myGameArea.x < 300 + 205 &&
-                 myGameArea.y > 373 && myGameArea.y < 373 + 35) {
+      // } else if (myGameArea.x > 300 && myGameArea.x < 300 + 205 &&
+      //            myGameArea.y > 373 && myGameArea.y < 373 + 35) {
+      } else if (myGameArea.y > 373 && myGameArea.y < 373 + 35) {
         mode = "MAINMENU";
         just_changed_mode = true;
         just_clicked = true;
@@ -533,8 +543,9 @@ class Instructions {
 
     // Detect mouse click
     if (myGameArea.mouseclick) {
-      if (myGameArea.x > 300 && myGameArea.x < 300 + 205 &&
-          myGameArea.y > 474 && myGameArea.y < 474 + 35) {
+      // if (myGameArea.x > 300 && myGameArea.x < 300 + 205 &&
+      //     myGameArea.y > 474 && myGameArea.y < 474 + 35) {
+      if (myGameArea.y > 474 && myGameArea.y < 474 + 35) {
         mode = "MAINMENU";
         just_changed_mode = true;
       }
@@ -870,6 +881,10 @@ function updateGameArea() {
     if (mlen != missiles.length) { // Missile was deleted; adjust index
       i--;
     }
+  }
+  if (myGameArea.mouseclick) {
+    myGameArea.mouseclick = false;
+    just_clicked = false;
   }
 }
 
